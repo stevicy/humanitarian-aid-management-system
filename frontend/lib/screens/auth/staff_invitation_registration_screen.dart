@@ -470,6 +470,95 @@ class _StaffInvitationRegistrationFormState
     );
   }
 
+
+  // Visual password feedback only; server validation remains authoritative.
+  int _passwordStrengthLevel(String password) {
+    if (password.isEmpty) return 0;
+
+    final length = password.runes.length;
+    final categories = <bool>[
+      RegExp(r'[A-Z]').hasMatch(password),
+      RegExp(r'[a-z]').hasMatch(password),
+      RegExp(r'[0-9]').hasMatch(password),
+      RegExp(r'[^A-Za-z0-9\s]').hasMatch(password),
+    ].where((matched) => matched).length;
+
+    final normalized = password.toLowerCase();
+    final predictable = <String>[
+      'password', 'qwerty', '1234', 'welcome', 'letmein', 'admin', 'aidtrack',
+    ].any(normalized.contains);
+
+    if (length < 8 || categories < 2) return 1;
+    if (length < 12 || categories < 4 || predictable) return 2;
+    if (length >= 16 && password.runes.toSet().length >= 10) return 4;
+    return 3;
+  }
+
+  Widget _passwordStrengthIndicator() {
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: _password,
+      builder: (context, value, _) {
+        final strength = _passwordStrengthLevel(value.text);
+        if (strength == 0) return const SizedBox.shrink();
+
+        final label = <String>['', 'Weak', 'Fair', 'Good', 'Strong'][strength];
+        final color = <Color>[
+          AppColors.greyText,
+          const Color(0xFFC62828),
+          const Color(0xFFC58B16),
+          const Color(0xFF388E3C),
+          AppColors.primaryGreen,
+        ][strength];
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Text(
+                  'Password strength',
+                  style: TextStyle(fontSize: 12, color: AppColors.greyText),
+                ),
+                const Spacer(),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 7),
+            Row(
+              children: List.generate(4, (index) {
+                return Expanded(
+                  child: Container(
+                    height: 7,
+                    margin: EdgeInsets.only(right: index == 3 ? 0 : 6),
+                    decoration: BoxDecoration(
+                      color: index < strength
+                          ? color
+                          : const Color(0xFFE7ECE8),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 5),
+            const Text(
+              'Strength is an estimate. All password requirements still apply.',
+              style: TextStyle(fontSize: 11, color: AppColors.greyText),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   // ========================================
   // REGISTRATION RIGHT-PANEL CONTENT
   // ========================================
@@ -761,6 +850,8 @@ class _StaffInvitationRegistrationFormState
                           return null;
                         },
                       ),
+
+                      _passwordStrengthIndicator(),
 
                       const SizedBox(height: 12),
 
