@@ -1360,7 +1360,7 @@ class _HouseholdAssessmentScreenState extends State<HouseholdAssessmentScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Monthly income per capita: '
+                            'Average monthly household income per person: '
                             '${assessment['monthly_income_per_capita'] ?? 'Not recorded'}',
                             style: const TextStyle(
                               fontSize: 12,
@@ -1696,12 +1696,17 @@ class _HouseholdAssessmentScreenState extends State<HouseholdAssessmentScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Monthly income per person (calculated): '
+                  'Average monthly household income per person (calculated): '
                   '${_perCapita == null ? '—' : '₱${_perCapita!.toStringAsFixed(2)}'}',
                   style: const TextStyle(
                     color: AppColors.greyText,
                     fontSize: 12,
                   ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Total monthly household income divided by all household members.',
+                  style: TextStyle(color: AppColors.greyText, fontSize: 12),
                 ),
               ],
             ),
