@@ -892,7 +892,7 @@ class _LoginScreenState extends State<LoginScreen> {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 const Text(
-                  "Don't have an account? ",
+                  "Have an invitation link? ",
                   style: TextStyle(color: AppColors.greyText),
                 ),
                 TextButton(
