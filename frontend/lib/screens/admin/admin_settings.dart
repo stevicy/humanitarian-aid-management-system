@@ -131,10 +131,45 @@ class _AdminSettingsState extends State<AdminSettings> {
         throw const FormatException('Invalid profile response.');
       }
 
+      // Staff can view their own employee details saved during invitation registration.
+      Map<String, dynamic>? staffDetails;
+      if (data['role'] == 'Staff') {
+        final staffResponse = await http
+            .get(
+              Uri.parse('${AuthService.baseUrl}/auth/staff-profile'),
+              headers: _headers(),
+            )
+            .timeout(const Duration(seconds: 15));
+
+        if (staffResponse.statusCode == 401) {
+          throw const AuthException(
+            'Your session has expired. Please log out and log in again.',
+          );
+        }
+        if (staffResponse.statusCode == 404) {
+          // Older Staff accounts may not have an invitation profile.
+          staffDetails = null;
+        } else if (staffResponse.statusCode != 200) {
+          throw const AuthException('Unable to load staff employee details.');
+        } else {
+          final details = jsonDecode(staffResponse.body);
+          if (details is! Map<String, dynamic> ||
+              details['contact_number'] is! String ||
+              details['position'] is! String ||
+              details['office'] is! String) {
+            throw const FormatException('Invalid employee profile response.');
+          }
+          staffDetails = details;
+        }
+      }
+
       if (!mounted) return;
 
       setState(() {
-        _profile = data;
+        _profile = {
+          ...data,
+          'staff_details': staffDetails,
+        };
       });
     } catch (error) {
       if (!mounted) return;
@@ -630,32 +665,54 @@ class _AdminSettingsState extends State<AdminSettings> {
     );
   }
 
+  String _staffProfileValue(dynamic value) {
+    if (value == null || value.toString().trim().isEmpty) {
+      return 'Not provided';
+    }
+    return value.toString();
+  }
+
   Widget _profileDetails() {
+    final isStaff = _profile!['role'] == 'Staff';
+    final staffDetails = _profile!['staff_details'];
+    final fields = <MapEntry<String, String>>[
+      MapEntry('Full Name', _profile!['full_name'] as String),
+      MapEntry('Email', _profile!['email'] as String),
+      MapEntry('Role', _profile!['role'] as String),
+      if (isStaff && staffDetails is Map<String, dynamic>) ...[
+        MapEntry('Employee Number', _staffProfileValue(staffDetails['employee_number'])),
+        MapEntry('Contact Number', _staffProfileValue(staffDetails['contact_number'])),
+        MapEntry('Position', _staffProfileValue(staffDetails['position'])),
+        MapEntry('Office / Department', _staffProfileValue(staffDetails['office'])),
+      ],
+    ];
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final threeColumns = constraints.maxWidth >= 690;
         final width = threeColumns
             ? (constraints.maxWidth - 24) / 3
             : constraints.maxWidth;
-        return Wrap(
-          spacing: 12,
-          runSpacing: 12,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(
-              width: width,
-              child: _profileDetail(
-                'Full Name',
-                _profile!['full_name'] as String,
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: fields.map((field) {
+                return SizedBox(
+                  width: width,
+                  child: _profileDetail(field.key, field.value),
+                );
+              }).toList(),
+            ),
+            if (isStaff && staffDetails == null) ...[
+              const SizedBox(height: 12),
+              const Text(
+                'No saved employee profile found for this account.',
+                style: TextStyle(fontSize: 12, color: AppColors.greyText),
               ),
-            ),
-            SizedBox(
-              width: width,
-              child: _profileDetail('Email', _profile!['email'] as String),
-            ),
-            SizedBox(
-              width: width,
-              child: _profileDetail('Role', _profile!['role'] as String),
-            ),
+            ],
           ],
         );
       },

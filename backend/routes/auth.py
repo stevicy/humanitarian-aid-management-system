@@ -264,6 +264,29 @@ def get_my_account(
     return current_user
 
 
+# Staff can view only their own registration profile; no assignment permissions.
+@router.get("/staff-profile")
+def get_my_staff_profile(current_user: dict = Depends(get_current_user)):
+    if current_user["role"] != "Staff":
+        raise HTTPException(status_code=403, detail="Staff account required.")
+
+    with get_connection() as connection:
+        with connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(
+                """
+                SELECT employee_number, contact_number, position, office
+                FROM public.staff_profiles
+                WHERE user_id = %s;
+                """,
+                (current_user["user_id"],),
+            )
+            details = cursor.fetchone()
+
+    if details is None:
+        raise HTTPException(status_code=404, detail="Staff profile not found.")
+    return dict(details)
+
+
 # Change only the password of the currently logged-in account.
 @router.post("/change-password")
 def change_password(
