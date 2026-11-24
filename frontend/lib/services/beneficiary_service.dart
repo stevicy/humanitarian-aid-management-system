@@ -161,6 +161,34 @@ class BeneficiaryService {
     _checkResponse(response, 200);
   }
 
+  // Fetch the exact saved assessment linked to a beneficiary review.
+  static Future<Map<String, dynamic>> fetchAssessment(int assessmentId) async {
+    final response = await http
+        .get(
+          Uri.parse('${AuthService.baseUrl}/assessments/$assessmentId'),
+          headers: _headers(),
+        )
+        .timeout(_timeout);
+    _checkResponse(response, 200);
+    return _decodeObject(response);
+  }
+
+  // Obtain the names and types of the 46 model inputs from FastAPI.
+  static Future<List<Map<String, dynamic>>> fetchAssessmentFeatureCatalog() async {
+    final response = await http
+        .get(
+          Uri.parse('${AuthService.baseUrl}/assessments/apis2022/feature-catalog'),
+          headers: _headers(),
+        )
+        .timeout(_timeout);
+    _checkResponse(response, 200);
+    final catalog = _decodeObject(response)['model_inputs'];
+    if (catalog is! List) {
+      throw const FormatException('Assessment feature catalog unavailable.');
+    }
+    return catalog.map((item) => Map<String, dynamic>.from(item as Map)).toList();
+  }
+
   // Retrieve the audit history of status changes.
   static Future<List<Map<String, dynamic>>> fetchHistory(
     int beneficiaryId,

@@ -9,6 +9,8 @@ import '../../core/theme/app_theme.dart';
 import '../../services/auth_service.dart';
 import '../../services/beneficiary_service.dart';
 import '../../widgets/aidtrack_module_loading.dart';
+import '../vulnerability_classification/vulnerability_classification.dart'
+    show apis2022Options;
 
 class BeneficiaryManagementScreen extends StatefulWidget {
   const BeneficiaryManagementScreen({super.key});
@@ -850,6 +852,26 @@ class _BeneficiaryManagementScreenState
                       ),
                     ),
                   ],
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () => _showLinkedAssessment(beneficiary),
+                    icon: const Icon(Icons.visibility_outlined, size: 18),
+                    label: const Text('View saved assessment answers'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primaryGreen,
+                    ),
+                  ),
+                  if (selectedStatus == 'For Review')
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        'If assessment details must be corrected, save a new '
+                        'assessment and classification first. Then use '
+                        'Use latest assessment to link it for re-review.',
+                        style: TextStyle(fontSize: 12,
+                          color: AppColors.greyText, height: 1.45),
+                      ),
+                    ),
                   const SizedBox(height: 6),
                   const Text(
                     'The vulnerability classification supports Staff review; '
@@ -904,8 +926,341 @@ class _BeneficiaryManagementScreenState
   }
 
   // ==========================================
-  // VIEW REVIEW HISTORY
+  // READ-ONLY LINKED ASSESSMENT
   // ==========================================
+
+  static const _reviewSurveyCodes = <String, String>{
+    'roof_material': 'I2',
+    'outer_wall_material': 'I3',
+    'floor_material': 'I4',
+    'electricity_available': 'I8',
+    'drinking_water_source': 'WS1',
+    'toilet_facility': 'WS11A',
+    'disaster_preparedness_kit': 'G15_KIT',
+    'experienced_natural_disaster': 'G16_NAT_DISAS',
+    'disaster_evacuated_or_displaced': 'G16A_EVAC',
+    'recovered_from_disaster': 'G16B_RECOV',
+  };
+
+  static const _reviewGroups = <String, List<String>>{
+    'Household, Income & Members': [
+      'family_size',
+      'members_age_0_5',
+      'members_age_6_11',
+      'members_age_12_17',
+      'members_age_60_plus',
+      'monthly_income',
+      'monthly_income_per_capita',
+      'bedroom_count',
+    ],
+    'Housing, Water & Sanitation': [
+      'roof_material',
+      'outer_wall_material',
+      'floor_material',
+      'electricity_available',
+      'drinking_water_source',
+      'toilet_facility',
+    ],
+    'Disaster Experience & Preparedness': [
+      'disaster_preparedness_kit',
+      'experienced_natural_disaster',
+      'disaster_evacuated_or_displaced',
+      'recovered_from_disaster',
+    ],
+    'Household Assets': [
+      'owns_car_jeep_van',
+      'owns_electric_jeep',
+      'owns_motorcycle_tricycle',
+      'owns_electric_tricycle',
+      'owns_motorized_boat',
+      'owns_tractor',
+      'owns_washing_machine',
+      'owns_stove_with_oven_or_gas_range',
+      'owns_induction_stove',
+      'owns_refrigerator_freezer',
+      'owns_personal_computer',
+      'owns_air_conditioner',
+      'owns_basic_cellphone',
+      'owns_smartphone',
+      'owns_microwave_or_oven_toaster',
+      'owns_landline_or_wireless_telephone',
+      'owns_videoke_magic_sing',
+      'owns_television',
+      'owns_radio',
+      'owns_draft_animals',
+    ],
+    'Connectivity & Subscriptions': [
+      'has_cable_subscription',
+      'has_broadband_internet_subscription',
+      'has_video_streaming_subscription',
+    ],
+    'Health & Government Programs': [
+      'philhealth_membership_status',
+      'received_philhealth_benefits',
+      'social_insurance_program_count',
+      'social_assistance_program_count',
+      'labor_market_program_count',
+      'government_services_accessed_count',
+    ],
+  };
+
+  static const _reviewLabels = <String, String>{
+    'family_size': 'Household size',
+    'monthly_income': 'Total household monthly income',
+    'monthly_income_per_capita': 'Average monthly income per person',
+    'members_age_0_5': 'Members aged 0–5',
+    'members_age_6_11': 'Members aged 6–11',
+    'members_age_12_17': 'Members aged 12–17',
+    'members_age_60_plus': 'Members aged 60+',
+    'disaster_preparedness_kit': 'Emergency go bag / disaster kit',
+    'experienced_natural_disaster': 'Experienced a natural disaster',
+    'disaster_evacuated_or_displaced': 'Displaced or evacuated',
+    'recovered_from_disaster': 'Recovered from the disaster',
+    'philhealth_membership_status': 'PhilHealth membership',
+    'received_philhealth_benefits': 'Received PhilHealth benefits',
+    'social_insurance_program_count': 'Social insurance programs (count)',
+    'social_assistance_program_count': 'Social assistance programs (count)',
+    'labor_market_program_count': 'Employment and livelihood programs (count)',
+    'government_services_accessed_count': 'Government services accessed (count)',
+  };
+
+  String _reviewAnswer(
+    String field,
+    dynamic raw,
+    Map<String, dynamic>? specification,
+  ) {
+    if (raw == null || raw.toString().trim().isEmpty) {
+      return 'Not answered';
+    }
+    if (field == 'monthly_income' || field == 'monthly_income_per_capita') {
+      final amount = num.tryParse(raw.toString());
+      return amount == null ? raw.toString() : '₱${amount.toStringAsFixed(2)}';
+    }
+    if (field == 'philhealth_membership_status') {
+      const choices = <int, String>{
+        1: 'Yes — paying member',
+        2: 'Yes — non-paying member',
+        3: 'No',
+      };
+      return choices[_id(raw)] ?? 'Code ${raw.toString()}';
+    }
+    final pufName = _reviewSurveyCodes[field];
+    if (pufName != null) {
+      return apis2022Options[pufName]?[_id(raw)] ?? 'Code ${raw.toString()}';
+    }
+    if (specification?['kind'] == 'code') {
+      final options = specification?['options'];
+      if (options is List && options.length == 2 &&
+          options.contains(1) && options.contains(2)) {
+        return _id(raw) == 1 ? 'Yes' : 'No';
+      }
+    }
+    return raw.toString();
+  }
+
+  Widget _reviewDetailRow(String label, String value) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: Color(0xFFE4EBE5))),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 460;
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: const TextStyle(
+                  fontSize: 12, color: AppColors.greyText,
+                )),
+                const SizedBox(height: 4),
+                Text(value, style: const TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w600,
+                  color: AppColors.darkText,
+                )),
+              ],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 3,
+                child: Text(label, style: const TextStyle(
+                  fontSize: 12, color: AppColors.greyText,
+                )),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 4,
+                child: Text(value, style: const TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w600,
+                  color: AppColors.darkText,
+                )),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _reviewAssessmentContent(
+    Map<String, dynamic> assessment,
+    List<Map<String, dynamic>> catalog,
+  ) {
+    final specs = <String, Map<String, dynamic>>{
+      for (final item in catalog) item['name'].toString(): item,
+    };
+    final modelFieldNames = specs.keys.toSet();
+    // Guard against a version mismatch instead of silently hiding a model input.
+    final displayedModelFields = _reviewGroups.values
+        .expand((fields) => fields)
+        .where((field) => field != 'monthly_income')
+        .toSet();
+    if (modelFieldNames.length != 46 ||
+        !modelFieldNames.containsAll(displayedModelFields) ||
+        !displayedModelFields.containsAll(modelFieldNames)) {
+      return const Text(
+        'Assessment fields have changed. Please update the review screen '
+        'before making a decision.',
+        style: TextStyle(color: Color(0xFFC62828)),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '${_value(assessment['household_head'])} • '
+          'Household #${_value(assessment['household_id'])}',
+          style: const TextStyle(
+            fontSize: 15, fontWeight: FontWeight.w700,
+            color: AppColors.darkText,
+          ),
+        ),
+        const SizedBox(height: 5),
+        Text(
+          'Assessment #${_value(assessment['assessment_id'])} • '
+          '${_value(assessment['assessment_date'])} • '
+          '${_value(assessment['barangay'])}',
+          style: const TextStyle(fontSize: 12, color: AppColors.greyText),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.lightGreen,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: const Text(
+            'READ ONLY — These are the original saved assessment answers '
+            'linked to this beneficiary decision. A classified assessment '
+            'cannot be edited.',
+            style: TextStyle(fontSize: 12, color: AppColors.darkText,
+              height: 1.45),
+          ),
+        ),
+        const SizedBox(height: 8),
+        for (final group in _reviewGroups.entries) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(0, 18, 0, 6),
+            child: Text(group.key, style: const TextStyle(
+              fontSize: 14, fontWeight: FontWeight.bold,
+              color: AppColors.primaryGreen,
+            )),
+          ),
+          for (final field in group.value)
+            _reviewDetailRow(
+              _reviewLabels[field] ??
+                  specs[field]?['label']?.toString() ??
+                  field.replaceAll('_', ' '),
+              _reviewAnswer(field, assessment[field], specs[field]),
+            ),
+        ],
+        const SizedBox(height: 18),
+        const Text(
+          'Needs reassessment? If information is outdated or incorrect, '
+          'create a NEW assessment in Household Assessment, run its '
+          'Vulnerability Classification, then return here and choose '
+          'Use latest assessment. The earlier record remains unchanged.',
+          style: TextStyle(fontSize: 12, color: AppColors.greyText,
+            height: 1.5),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showLinkedAssessment(Map<String, dynamic> beneficiary) async {
+    final assessmentId = _id(beneficiary['assessment_id']);
+    if (assessmentId < 1) {
+      await _showFeedbackDialog(
+        success: false,
+        title: 'Assessment Unavailable',
+        message: 'This beneficiary has no linked assessment.',
+      );
+      return;
+    }
+    final detailsFuture = Future.wait<dynamic>([
+      BeneficiaryService.fetchAssessment(assessmentId),
+      BeneficiaryService.fetchAssessmentFeatureCatalog(),
+    ]);
+    if (!mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.white,
+        surfaceTintColor: AppColors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
+        title: _dialogHeading(
+          title: 'View Saved Assessment',
+          subtitle: 'Original household answers for beneficiary review',
+          icon: Icons.visibility_outlined,
+        ),
+        content: SizedBox(
+          width: 680,
+          height: MediaQuery.sizeOf(dialogContext).height * 0.66,
+          child: FutureBuilder<List<dynamic>>(
+            future: detailsFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState != ConnectionState.done) {
+                return const Center(child: CircularProgressIndicator(
+                  color: AppColors.primaryGreen,
+                ));
+              }
+              if (snapshot.hasError) {
+                return Center(
+                  child: Text(_errorMessage(snapshot.error!),
+                    style: const TextStyle(color: Color(0xFFC62828))),
+                );
+              }
+              final assessment = snapshot.data![0] as Map<String, dynamic>;
+              final catalog = snapshot.data![1] as List<Map<String, dynamic>>;
+              return SingleChildScrollView(
+                child: _reviewAssessmentContent(assessment, catalog),
+              );
+            },
+          ),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryGreen,
+              foregroundColor: AppColors.white,
+            ),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   Future<void> _showHistory(Map<String, dynamic> beneficiary) async {
     final beneficiaryId = _id(beneficiary['beneficiary_id']);
@@ -1490,6 +1845,21 @@ class _BeneficiaryManagementScreenState
             spacing: 10,
             runSpacing: 8,
             children: [
+              OutlinedButton.icon(
+                onPressed: _isSaving || _isLoading
+                    ? null
+                    : () => _showLinkedAssessment(beneficiary),
+                icon: const Icon(Icons.visibility_outlined, size: 18),
+                label: const Text('View Assessment'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primaryGreen,
+                  side: const BorderSide(color: AppColors.primaryGreen),
+                  minimumSize: const Size(0, 40),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
               OutlinedButton.icon(
                 onPressed: _isSaving ? null : () => _showHistory(beneficiary),
                 icon: const Icon(Icons.history, size: 18),
