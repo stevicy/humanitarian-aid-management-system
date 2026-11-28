@@ -23,6 +23,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "http://localhost:5000",
+        "http://127.0.0.1:5000",
     ],
     allow_credentials=False,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
@@ -40,8 +42,6 @@ app.include_router(assessments_router)
 app.include_router(vulnerability_router)
 app.include_router(distributions_router)
 app.include_router(reports_router)
-
-# Enable Beneficiary Management endpoints.
 app.include_router(beneficiaries_router)
 
 
