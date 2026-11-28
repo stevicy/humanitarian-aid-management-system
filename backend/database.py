@@ -19,8 +19,6 @@ def get_connection():
         connect_timeout=3,
     )
 
-
-# Run this check only when database.py is executed directly
 if __name__ == "__main__":
     with get_connection() as connection:
         with connection.cursor() as cursor:
