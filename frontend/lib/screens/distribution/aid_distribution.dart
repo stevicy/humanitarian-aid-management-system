@@ -1134,7 +1134,7 @@ class _AidDistributionScreenState extends State<AidDistributionScreen> {
               title: '1. Beneficiary',
               icon: Icons.people_outline,
               description: _editingDistribution == null
-                  ? 'Select a household and verify its assessment reference.'
+                  ? 'Select an approved beneficiary and verify their household information.'
                   : 'The original beneficiary and assessment reference are protected.',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
