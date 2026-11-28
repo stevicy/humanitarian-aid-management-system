@@ -13,7 +13,7 @@ from services.gmail_login_email import _make_message, _send_message
 
 def build_invitation_url(token: str) -> str:
     # The host is explicitly configured, never taken from the incoming Host header.
-    base_url = os.getenv('FRONTEND_PUBLIC_URL', 'http://localhost:3000').strip().rstrip('/')
+    base_url = os.getenv('FRONTEND_PUBLIC_URL', 'http://localhost:5000').strip().rstrip('/')
     if not (base_url.startswith('https://') or base_url.startswith('http://localhost:') or base_url.startswith('http://127.0.0.1:')):
         raise RuntimeError('FRONTEND_PUBLIC_URL must be HTTPS, except for local development.')
     return f'{base_url}/?invite={quote(token, safe="")}'
