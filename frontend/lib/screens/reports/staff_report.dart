@@ -1004,8 +1004,6 @@ class _StaffReportScreenState extends State<StaffReportScreen> {
         else if (report != null) ...[
           _totalsSection(totals),
           const SizedBox(height: 18),
-          _analysisCard(totals, barangays),
-          const SizedBox(height: 18),
           _section(
             title: 'Aid Distribution',
             subtitle: 'Distribution records for the households in this report.',
@@ -1015,6 +1013,8 @@ class _StaffReportScreenState extends State<StaffReportScreen> {
               ('Practice entries', 'simulated_distributions', Icons.assignment_outlined),
             ], totals),
           ),
+          const SizedBox(height: 18),
+          _analysisCard(totals, barangays),
           const SizedBox(height: 18),
           _section(
             title: 'Barangay Breakdown',
