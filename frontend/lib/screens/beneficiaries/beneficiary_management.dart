@@ -601,7 +601,7 @@ class _BeneficiaryManagementScreenState
         actionsPadding: const EdgeInsets.fromLTRB(22, 12, 22, 20),
         title: _dialogHeading(
           title: 'Check Latest Assessment',
-          subtitle: 'Check for a newer assessment and classification',
+          subtitle: 'Check for updated assessment and classification records.',
           icon: Icons.sync_outlined,
         ),
         content: SizedBox(
@@ -1878,7 +1878,7 @@ class _BeneficiaryManagementScreenState
                     ? null
                     : () => _useLatestAssessment(beneficiary),
                 icon: const Icon(Icons.sync, size: 18),
-                label: const Text('Use latest assessment'),
+                label: const Text('Check Latest Assessment'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.primaryGreen,
                   side: const BorderSide(color: Color(0xFFD6E2D8)),
@@ -1942,7 +1942,7 @@ class _BeneficiaryManagementScreenState
         _sectionCard(
           title: 'Households for Beneficiary Review',
           subtitle:
-              'Select a classified household to register for manual review.',
+              'Select a classified household for beneficiary eligibility review.',
           icon: Icons.people_outline,
           trailing: _refreshButton(),
           child: Column(
